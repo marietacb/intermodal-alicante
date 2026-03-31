@@ -1,7 +1,7 @@
 from flask import Flask, render_template, Response
 from flask_cors import CORS
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 app = Flask(__name__)
 CORS(app) 
@@ -24,11 +24,11 @@ def index():
 @app.route('/datos')
 def obtener_datos():
     try:
-        query = "SELECT * FROM lecturas_colector ORDER BY timestamp ASC LIMIT 1000"
-        
-        # ABRIMOS LA CONEXIÓN CORRECTAMENTE AQUÍ TAMBIÉN
-        with engine.connect() as conexion:
-            df = pd.read_sql(query, con=conexion)
+        query = text("SELECT * FROM lecturas_colector ORDER BY timestamp ASC LIMIT 1000")
+
+        with engine.connect() as conn:
+            result = conn.execute(query)
+            df = pd.DataFrame(result.fetchall(), columns=result.keys())
         
         df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y-%m-%dT%H:%M:%S')
         json_data = df.to_json(orient='records')

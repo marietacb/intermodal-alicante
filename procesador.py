@@ -1,7 +1,7 @@
 import os
 import shutil
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Table, MetaData
 
 # --- CONFIGURACIÓN BD ---
 DB_USER = 'postgres'
@@ -37,18 +37,18 @@ def procesar_archivos():
             df = pd.read_csv(ruta_origen)
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             
-            # CAMBIO 2: Usar un bloque "with" para abrir y cerrar la conexión correctamente
-            with engine.begin() as conexion:
-                df.to_sql('lecturas_colector', con=conexion, if_exists='append', index=False)
+            tabla = Table('lecturas_colector', MetaData(), autoload_with=engine)
+            with engine.begin() as conn:
+                conn.execute(tabla.insert(), df.to_dict(orient='records'))
             
             # 3. Mover a procesados
             shutil.move(ruta_origen, os.path.join(CARPETA_PROCESADOS, archivo))
-            print(f"✅ ÉXITO: {archivo} guardado en BD.")
+            print(f"[OK] {archivo} guardado en BD.")
             
         except Exception as e:
             # 4. Mover a errores si falla
             shutil.move(ruta_origen, os.path.join(CARPETA_ERRORES, archivo))
-            print(f"❌ ERROR con {archivo}: {e}")
+            print(f"[ERROR] {archivo}: {e}")
 
 if __name__ == '__main__':
     procesar_archivos()
