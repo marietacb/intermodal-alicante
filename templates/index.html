@@ -304,7 +304,7 @@ function updateCharts(apiRows) {
 
 async function fetchAndUpdate() {
   try {
-    const res = await fetch('/datos'); // Llama al endpoint de Flask
+    const res = await fetch('../datos.php');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
     const apiRows = Array.isArray(payload) ? payload : (payload?.lecturas ?? []);
