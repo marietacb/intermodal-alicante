@@ -6,6 +6,7 @@
 <title>Monitorización Colector - Intermodal Alicante</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <style>
   :root {
     --bg:       #ffffff;
@@ -148,6 +149,66 @@
     main { padding:12px; }
     .chart-wrap { height:180px; }
   }
+
+  /* ── MODAL UPLOAD ── */
+  .modal-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,.55); z-index:1000;
+    align-items:center; justify-content:center;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-box {
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:24px; width:480px; max-width:95vw;
+    max-height:85vh; overflow-y:auto;
+  }
+  .modal-header {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:16px; padding-bottom:12px;
+    border-bottom:1px solid var(--border);
+  }
+  .modal-title { font-size:1rem; font-weight:700; }
+  .modal-close {
+    background:none; border:none; cursor:pointer;
+    color:var(--text2); font-size:1.2rem;
+    padding:4px 8px; border-radius:6px;
+  }
+  .modal-close:hover { background:var(--bg3); color:var(--text); }
+  .upload-area {
+    border:2px dashed var(--border); border-radius:var(--radius);
+    padding:24px; text-align:center; cursor:pointer;
+    transition:border-color .2s, background .2s; margin-bottom:12px;
+  }
+  .upload-area:hover, .upload-area.drag-over {
+    border-color:var(--accent); background:rgba(59,130,246,.05);
+  }
+  .upload-area input[type="file"] { display:none; }
+  .upload-label { font-size:.9rem; color:var(--text2); }
+  .upload-label b { color:var(--text); }
+  .upload-fname { font-size:.85rem; color:var(--accent); margin-top:6px; min-height:1.2em; }
+  .btn-upload {
+    width:100%; padding:10px; background:var(--accent); color:#fff;
+    border:none; border-radius:var(--radius); font-size:.9rem;
+    font-weight:600; cursor:pointer; transition:opacity .2s;
+  }
+  .btn-upload:hover { opacity:.85; }
+  .btn-upload:disabled { opacity:.45; cursor:not-allowed; }
+  .upload-history { margin-top:20px; }
+  .upload-history h4 {
+    font-size:.75rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--text2);
+    margin-bottom:8px; border-bottom:1px solid var(--border); padding-bottom:4px;
+  }
+  .history-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  .history-table th {
+    text-align:left; color:var(--text2); font-weight:600;
+    padding:4px 6px; border-bottom:1px solid var(--border);
+  }
+  .history-table td {
+    padding:5px 6px; border-bottom:1px solid var(--border); color:var(--text);
+  }
+  .history-table tr:last-child td { border-bottom:none; }
 </style>
 </head>
 <body>
@@ -160,6 +221,9 @@
       <div class="subtitle">489 lecturas · 05 Mar – 25 Mar 2026</div>
     </div>
   </div>
+  <button class="toggle-btn" onclick="openUploadModal()">
+    <span class="toggle-icon">⬆</span> Importar CSV
+  </button>
   <button class="toggle-btn" id="themeBtn" onclick="toggleTheme()">
     <span class="toggle-icon" id="themeIcon">🌙</span>
     <span id="themeLabel">Fondo oscuro</span>
@@ -205,6 +269,32 @@
     </div>
     <div class="hint">💡 Rueda del ratón para zoom · Arrastrar para desplazar</div>
   </main>
+</div>
+
+<!-- Modal Importar CSV -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Importar datos CSV</span>
+      <button class="modal-close" onclick="closeUploadModal()">✕</button>
+    </div>
+
+    <form id="uploadForm">
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('csvInput').click()">
+        <input type="file" id="csvInput" name="file" accept=".csv">
+        <div class="upload-label">
+          <b>Haz clic para seleccionar</b> o arrastra un archivo .csv
+        </div>
+        <div class="upload-fname" id="uploadFname"></div>
+      </div>
+      <button type="submit" class="btn-upload" id="btnUpload" disabled>SUBIR DATOS</button>
+    </form>
+
+    <div class="upload-history">
+      <h4>Historial de cargas</h4>
+      <div id="historialContainer"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -304,7 +394,7 @@ function updateCharts(apiRows) {
 
 async function fetchAndUpdate() {
   try {
-    const res = await fetch('../datos.php');
+    const res = await fetch('/datos');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
     const apiRows = Array.isArray(payload) ? payload : (payload?.lecturas ?? []);
@@ -423,6 +513,99 @@ fetchAndUpdate();
 
 // Refrescar automáticamente los datos cada 60 segundos (60000 ms)
 setInterval(fetchAndUpdate, 60_000);
+
+// ── UPLOAD MODAL ──────────────────────────────────────────────────────
+function openUploadModal() {
+  document.getElementById('uploadModal').classList.add('open');
+  loadHistory();
+}
+function closeUploadModal() {
+  document.getElementById('uploadModal').classList.remove('open');
+}
+document.getElementById('uploadModal').addEventListener('click', function(e) {
+  if (e.target === this) closeUploadModal();
+});
+
+const csvInput   = document.getElementById('csvInput');
+const uploadArea = document.getElementById('uploadArea');
+const btnUpload  = document.getElementById('btnUpload');
+const uploadFname = document.getElementById('uploadFname');
+
+csvInput.addEventListener('change', function() {
+  const fname = this.files[0]?.name || '';
+  uploadFname.textContent = fname;
+  btnUpload.disabled = !fname;
+});
+
+uploadArea.addEventListener('dragover', (e) => {
+  e.preventDefault(); uploadArea.classList.add('drag-over');
+});
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', (e) => {
+  e.preventDefault(); uploadArea.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.endsWith('.csv')) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    csvInput.files = dt.files;
+    uploadFname.textContent = file.name;
+    btnUpload.disabled = false;
+  }
+});
+
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  btnUpload.disabled = true;
+  btnUpload.textContent = 'Subiendo...';
+
+  const formData = new FormData(e.target);
+  try {
+    const res  = await fetch('../upload.php', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.success) {
+      Swal.fire({ icon: 'success', title: 'Éxito', text: data.message, timer: 3000, showConfirmButton: false });
+      e.target.reset();
+      uploadFname.textContent = '';
+      loadHistory();
+      setTimeout(fetchAndUpdate, 800);
+    } else {
+      Swal.fire({ icon: 'error', title: 'Error al importar', text: data.message });
+    }
+  } catch (err) {
+    Swal.fire({ icon: 'error', title: 'Error', text: 'Fallo de conexión con el servidor.' });
+  } finally {
+    btnUpload.disabled = false;
+    btnUpload.textContent = 'SUBIR DATOS';
+  }
+});
+
+async function loadHistory() {
+  try {
+    const res  = await fetch('../upload.php?action=get_uploads');
+    const data = await res.json();
+    const container = document.getElementById('historialContainer');
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<p style="color:var(--text2);font-size:.8rem;margin-top:4px;">Sin cargas registradas.</p>';
+      return;
+    }
+
+    let html = `<table class="history-table">
+      <thead><tr><th>Fecha</th><th>Archivo</th><th>Registros</th></tr></thead><tbody>`;
+    data.forEach(c => {
+      html += `<tr>
+        <td>${c.fecha_fmt}</td>
+        <td style="word-break:break-all">${c.nombre_archivo}</td>
+        <td style="text-align:right">${c.num_registros}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (e) {
+    console.error('Error cargando historial:', e);
+  }
+}
 </script>
 </body>
 </html>

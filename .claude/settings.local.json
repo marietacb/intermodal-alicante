@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"<script>\\\\|</script>\\\\|modal-overlay\\\\|uploadModal\\\\|</div>$\" \"C:/Users/mcalvo/source/intermodal-alicante/templates/index.html\")",
+      "Bash(grep:*)"
+    ]
+  }
+}
