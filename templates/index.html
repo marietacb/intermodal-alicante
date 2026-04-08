@@ -394,14 +394,14 @@ function updateCharts(apiRows) {
 
 async function fetchAndUpdate() {
   try {
-    const res = await fetch('/datos');
+    const res = await fetch('../datos.php');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
     const apiRows = Array.isArray(payload) ? payload : (payload?.lecturas ?? []);
     updateCharts(apiRows);
     rebuildAll();
   } catch (err) {
-    console.error('Error al cargar datos desde /datos:', err);
+    console.error('Error al cargar datos desde ../datos.php:', err);
   }
 }
 
@@ -561,7 +561,14 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
   const formData = new FormData(e.target);
   try {
     const res  = await fetch('../upload.php', { method: 'POST', body: formData });
-    const data = await res.json();
+    const bodyText = await res.text();
+    let data = null;
+    try { data = JSON.parse(bodyText); } catch (_) {}
+    if (!res.ok) {
+      const msg = data?.message || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    if (!data) throw new Error('Respuesta inválida del servidor');
 
     if (data.success) {
       Swal.fire({ icon: 'success', title: 'Éxito', text: data.message, timer: 3000, showConfirmButton: false });
@@ -573,7 +580,7 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       Swal.fire({ icon: 'error', title: 'Error al importar', text: data.message });
     }
   } catch (err) {
-    Swal.fire({ icon: 'error', title: 'Error', text: 'Fallo de conexión con el servidor.' });
+    Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Fallo de conexión con el servidor.' });
   } finally {
     btnUpload.disabled = false;
     btnUpload.textContent = 'SUBIR DATOS';
@@ -583,7 +590,15 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
 async function loadHistory() {
   try {
     const res  = await fetch('../upload.php?action=get_uploads');
-    const data = await res.json();
+    const bodyText = await res.text();
+    let data = null;
+    try { data = JSON.parse(bodyText); } catch (_) {}
+    if (!res.ok) {
+      throw new Error((data && data.message) ? data.message : `HTTP ${res.status}`);
+    }
+    if (!Array.isArray(data)) {
+      throw new Error('Respuesta de historial inválida');
+    }
     const container = document.getElementById('historialContainer');
 
     if (!data || data.length === 0) {
