@@ -1,0 +1,23 @@
+# Desactivar listado de directorios
+Options -Indexes
+
+# Página de inicio principal
+DirectoryIndex templates/index.html index.html index.php
+
+# Proteger archivos sensibles de acceso directo
+<FilesMatch "\.(md|py|git|env|log|sql)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Proteger carpetas internas
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Bloquear acceso directo a carpetas de datos
+    RewriteRule ^datos_con_errores/ - [F,L]
+    RewriteRule ^datos_nuevos/ - [F,L]
+    RewriteRule ^datos_procesados/ - [F,L]
+    RewriteRule ^\.git/ - [F,L]
+    RewriteRule ^\.claude/ - [F,L]
+</IfModule>
