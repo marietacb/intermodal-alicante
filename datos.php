@@ -2,7 +2,7 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
-$host   = '82.223.120.91';
+$host   = 'localhost';
 $port   = '5432';
 $dbname = 'intermodal_db';
 $user   = 'postgres';

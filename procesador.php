@@ -4,7 +4,7 @@
  * Uso: php procesador.php
  */
 
-$host   = '82.223.120.91';
+$host   = 'localhost';
 $port   = '5432';
 $dbname = 'intermodal_db';
 $user   = 'postgres';

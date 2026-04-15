@@ -221,10 +221,10 @@
       <div class="subtitle">489 lecturas · 05 Mar – 25 Mar 2026</div>
     </div>
   </div>
-  <button class="toggle-btn" onclick="openUploadModal()">
+  <button class="toggle-btn" id="btnOpenUpload">
     <span class="toggle-icon">⬆</span> Importar CSV
   </button>
-  <button class="toggle-btn" id="themeBtn" onclick="toggleTheme()">
+  <button class="toggle-btn" id="themeBtn">
     <span class="toggle-icon" id="themeIcon">🌙</span>
     <span id="themeLabel">Fondo oscuro</span>
   </button>
@@ -236,11 +236,11 @@
     <div>
       <div class="group-title">⚙ Sensores activos</div>
       <div class="select-btns">
-        <button class="sel-btn" onclick="selectGroup('all')">Todos</button>
-        <button class="sel-btn" onclick="selectGroup('none')">Ninguno</button>
-        <button class="sel-btn" onclick="selectGroup('temp')">Temp.</button>
-        <button class="sel-btn" onclick="selectGroup('strain')">Deform.</button>
-        <button class="sel-btn" onclick="selectGroup('tilt')">Inclin.</button>
+        <button class="sel-btn" data-group="all">Todos</button>
+        <button class="sel-btn" data-group="none">Ninguno</button>
+        <button class="sel-btn" data-group="temp">Temp.</button>
+        <button class="sel-btn" data-group="strain">Deform.</button>
+        <button class="sel-btn" data-group="tilt">Inclin.</button>
       </div>
     </div>
 
@@ -276,11 +276,11 @@
   <div class="modal-box">
     <div class="modal-header">
       <span class="modal-title">Importar datos CSV</span>
-      <button class="modal-close" onclick="closeUploadModal()">✕</button>
+      <button class="modal-close" id="btnCloseUpload">✕</button>
     </div>
 
     <form id="uploadForm">
-      <div class="upload-area" id="uploadArea" onclick="document.getElementById('csvInput').click()">
+      <div class="upload-area" id="uploadArea">
         <input type="file" id="csvInput" name="file" accept=".csv">
         <div class="upload-label">
           <b>Haz clic para seleccionar</b> o arrastra un archivo .csv
@@ -304,14 +304,28 @@ const RAW = [];
 
 // Mapeo automático de las columnas reales de tu CSV a los gráficos
 const SENSORS = [
-  { "key": "S1_CH1_T_273901_0001", "label": "S1 Temperatura", "unit": "°C", "group": "temp", "color": "#ef4444" }, 
-  { "key": "S2_CH1_T_273902_0001", "label": "S2 Temperatura", "unit": "°C", "group": "temp", "color": "#f97316" }, 
-  { "key": "S3_CH1_T_273904_0002", "label": "S3 Temperatura", "unit": "°C", "group": "temp", "color": "#eab308" }, 
-  { "key": "S1_CH1_LG_273901_0001", "label": "S1 Microdeformación", "unit": "µε", "group": "strain", "color": "#3b82f6" }, 
-  { "key": "S2_CH1_LG_273902_0001", "label": "S2 Microdeformación", "unit": "µε", "group": "strain", "color": "#8b5cf6" }, 
-  { "key": "S3_CH1_LG_273904_0002", "label": "S3 Microdeformación", "unit": "µε", "group": "strain", "color": "#06b6d4" }, 
-  { "key": "S7_CH3_CL_242474_0001", "label": "S7 Inclinación", "unit": "°", "group": "tilt", "color": "#10b981" }, 
-  { "key": "S8_CH3_CL_227745_0002", "label": "S8 Inclinación", "unit": "°", "group": "tilt", "color": "#f43f5e" }
+  { "key": "S1_CH1_T_273901_0001", "label": "LG01_SC2_temp", "unit": "°C", "group": "temp", "color": "#ef4444" }, 
+  { "key": "S2_CH1_T_273902_0001", "label": "LG02_SC2_temp", "unit": "°C", "group": "temp", "color": "#f97316" }, 
+  { "key": "S3_CH1_T_273904_0002", "label": "LG03_SC2_temp", "unit": "°C", "group": "temp", "color": "#eab308" }, 
+  { "key": "S4_CH2_T_273901_0002", "label": "LG03_SC3_temp", "unit": "°C", "group": "temp", "color": "#84cc16" },
+  { "key": "S5_CH2_T_273902_0003", "label": "LG01_SC3_temp", "unit": "°C", "group": "temp", "color": "#22c55e" },
+  { "key": "S6_CH2_T_273904_0003", "label": "LG02_SC3_temp", "unit": "°C", "group": "temp", "color": "#14b8a6" },
+  { "key": "S9_CH4_T_240351_0001", "label": "LG01_SC4_temp", "unit": "°C", "group": "temp", "color": "#0ea5e9" },
+  { "key": "S10_CH4_T_273903_0001", "label": "LG02_SC4_temp", "unit": "°C", "group": "temp", "color": "#6366f1" },
+  { "key": "S11_CH4_T_273904_0001", "label": "LG03_SC4_temp", "unit": "°C", "group": "temp", "color": "#a855f7" },
+  { "key": "S1_CH1_LG_273901_0001", "label": "LG01_SC2_def", "unit": "µε", "group": "strain", "color": "#3b82f6" }, 
+  { "key": "S2_CH1_LG_273902_0001", "label": "LG02_SC2_def", "unit": "µε", "group": "strain", "color": "#8b5cf6" }, 
+  { "key": "S3_CH1_LG_273904_0002", "label": "LG03_SC2_def", "unit": "µε", "group": "strain", "color": "#06b6d4" }, 
+  { "key": "S4_CH2_LG_273901_0002", "label": "LG03_SC3_def", "unit": "µε", "group": "strain", "color": "#f59e0b" },
+  { "key": "S5_CH2_LG_273902_0003", "label": "LG01_SC3_def", "unit": "µε", "group": "strain", "color": "#f97316" },
+  { "key": "S6_CH2_LG_273904_0003", "label": "LG02_SC3_def", "unit": "µε", "group": "strain", "color": "#ef4444" },
+  { "key": "S9_CH4_LG_240351_0001", "label": "LG01_SC4_def", "unit": "µε", "group": "strain", "color": "#ec4899" },
+  { "key": "S10_CH4_LG_273903_0001", "label": "LG02_SC4_def", "unit": "µε", "group": "strain", "color": "#d946ef" },
+  { "key": "S11_CH4_LG_273904_0001", "label": "LG03_SC4_def", "unit": "µε", "group": "strain", "color": "#8b5cf6" },
+  { "key": "S7_CH3_CL_242474_0001", "label": "CLFO1_TRANS_SC3", "unit": "°", "group": "tilt", "color": "#10b981" }, 
+  { "key": "S8_CH3_CL_227745_0002", "label": "CLFO2_LONG_SC3", "unit": "°", "group": "tilt", "color": "#f43f5e" },
+  { "key": "Nivel_RS485_m", "label": "SNA_SC1", "unit": "m", "group": "level", "color": "#10b981" }
+  
 ];
 
 // ── STATE ─────────────────────────────────────────────────────────────
@@ -507,6 +521,13 @@ function rebuildAll() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────
+document.getElementById('btnOpenUpload')?.addEventListener('click', openUploadModal);
+document.getElementById('themeBtn')?.addEventListener('click', toggleTheme);
+document.getElementById('btnCloseUpload')?.addEventListener('click', closeUploadModal);
+document.querySelectorAll('.sel-btn[data-group]').forEach(btn => {
+  btn.addEventListener('click', () => selectGroup(btn.dataset.group));
+});
+
 buildSidebar();
 rebuildAll();
 fetchAndUpdate();
@@ -530,6 +551,10 @@ const csvInput   = document.getElementById('csvInput');
 const uploadArea = document.getElementById('uploadArea');
 const btnUpload  = document.getElementById('btnUpload');
 const uploadFname = document.getElementById('uploadFname');
+
+uploadArea.addEventListener('click', () => {
+  csvInput.click();
+});
 
 csvInput.addEventListener('change', function() {
   const fname = this.files[0]?.name || '';

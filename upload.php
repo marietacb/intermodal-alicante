@@ -8,17 +8,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$host   = '82.223.120.91';
-$port   = '5432';
-$dbname = 'intermodal_db';
-$user   = 'postgres';
-$pass   = 'EstrucDatosAdmin';
+$configuredHost = getenv('PGHOST') ?: '';
+$port   = getenv('PGPORT') ?: '5432';
+$dbname = getenv('PGDATABASE') ?: 'intermodal_db';
+$user   = getenv('PGUSER') ?: 'postgres';
+$pass   = getenv('PGPASSWORD') ?: 'EstrucDatosAdmin';
+$sslmode = getenv('PGSSLMODE') ?: 'prefer';
+$connectTimeout = getenv('PGCONNECT_TIMEOUT') ?: '5';
 
 try {
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
-    $pdo = new PDO($dsn, $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    ]);
+    $hostCandidates = [];
+    if ($configuredHost !== '') {
+        $hostCandidates[] = $configuredHost;
+    } else {
+        // Prioriza loopback para despliegues donde PHP y PostgreSQL comparten servidor.
+        $hostCandidates = ['localhost', '127.0.0.1', '82.223.120.91'];
+    }
+    $hostCandidates = array_values(array_unique($hostCandidates));
+
+    $sslCandidates = [$sslmode];
+    if ($sslmode !== 'disable') {
+        $sslCandidates[] = 'disable';
+    }
+    $sslCandidates = array_values(array_unique($sslCandidates));
+
+    $lastError = null;
+    $pdo = null;
+    foreach ($hostCandidates as $host) {
+        foreach ($sslCandidates as $ssl) {
+            try {
+                $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=$ssl;connect_timeout=$connectTimeout";
+                $pdo = new PDO($dsn, $user, $pass, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                ]);
+                break 2;
+            } catch (Exception $ex) {
+                $lastError = $ex;
+            }
+        }
+    }
+
+    if (!$pdo) {
+        throw $lastError ?: new Exception('No se pudo establecer conexión con PostgreSQL.');
+    }
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error de conexión: ' . $e->getMessage()]);

@@ -9,7 +9,7 @@ CORS(app)
 # --- CONFIGURACIÓN BD ---
 DB_USER = 'postgres'
 DB_PASS = 'EstrucDatosAdmin'
-DB_HOST = '82.223.120.91'
+DB_HOST = 'localhost'
 DB_PORT = '5432'
 DB_NAME = 'intermodal_db'
 
