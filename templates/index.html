@@ -241,6 +241,7 @@
         <button class="sel-btn" data-group="temp">Temp.</button>
         <button class="sel-btn" data-group="strain">Deform.</button>
         <button class="sel-btn" data-group="tilt">Inclin.</button>
+        <button class="sel-btn" data-group="level">Nivel</button>
       </div>
     </div>
 
@@ -266,6 +267,12 @@
       <h3>📏 Inclinación relativa (°)</h3>
       <div id="stats-tilt" class="stats-bar"></div>
       <div class="chart-wrap"><canvas id="chart-tilt"></canvas></div>
+    </div>
+    <!-- Nivel de agua -->
+    <div class="chart-card" id="card-level">
+      <h3>🌊 Nivel de agua (m)</h3>
+      <div id="stats-level" class="stats-bar"></div>
+      <div class="chart-wrap"><canvas id="chart-level"></canvas></div>
     </div>
     <div class="hint">💡 Rueda del ratón para zoom · Arrastrar para desplazar</div>
   </main>
@@ -353,6 +360,7 @@ function buildSidebar() {
     { id:'temp',   label:'Temperatura',     icon:'🌡' },
     { id:'strain', label:'Microdeformación',icon:'📐' },
     { id:'tilt',   label:'Inclinación',     icon:'📏' },
+    { id:'level',  label:'Nivel de agua',   icon:'🌊' },
   ];
   const list = document.getElementById('sensorList');
   list.innerHTML = '';
@@ -514,7 +522,7 @@ function makeChart(canvasId, group) {
 
 // ── REBUILD ALL ───────────────────────────────────────────────────────
 function rebuildAll() {
-  ['temp','strain','tilt'].forEach(g => {
+  ['temp','strain','tilt','level'].forEach(g => {
     buildStats(g);
     makeChart('chart-' + g, g);
   });
