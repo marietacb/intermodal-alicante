@@ -142,6 +142,103 @@
     font-size:.72rem; color:var(--text2); text-align:right;
     padding-top:4px;
   }
+  .range-card {
+    background:var(--bg2);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:12px 14px;
+    box-shadow:var(--shadow);
+  }
+  .range-title {
+    font-size:.76rem;
+    font-weight:700;
+    color:var(--text2);
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  .range-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:8px;
+  }
+  .range-date {
+    min-width:96px;
+    text-align:center;
+    font-size:.85rem;
+    font-weight:600;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:6px 8px;
+    box-shadow:var(--shadow);
+  }
+  .range-slider-wrap {
+    position:relative;
+    flex:1;
+    height:32px;
+  }
+  .range-slider-wrap input[type="range"] {
+    position:absolute;
+    left:0;
+    top:50%;
+    transform:translateY(-50%);
+    width:100%;
+    margin:0;
+    background:transparent;
+    -webkit-appearance:none;
+    appearance:none;
+    pointer-events:none;
+  }
+  .range-slider-wrap input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none;
+    appearance:none;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:#fff;
+    border:2px solid var(--accent);
+    box-shadow:0 1px 4px rgba(0,0,0,.2);
+    cursor:pointer;
+    pointer-events:auto;
+  }
+  .range-slider-wrap input[type="range"]::-moz-range-thumb {
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:#fff;
+    border:2px solid var(--accent);
+    box-shadow:0 1px 4px rgba(0,0,0,.2);
+    cursor:pointer;
+    pointer-events:auto;
+  }
+  .range-slider-wrap input[type="range"]::-webkit-slider-runnable-track {
+    height:4px;
+    background:transparent;
+  }
+  .range-slider-wrap input[type="range"]::-moz-range-track {
+    height:4px;
+    background:transparent;
+  }
+  .range-track {
+    position:absolute;
+    left:0;
+    right:0;
+    top:50%;
+    transform:translateY(-50%);
+    height:4px;
+    background:var(--border);
+    border-radius:10px;
+  }
+  .range-fill {
+    position:absolute;
+    top:0;
+    height:100%;
+    background:var(--accent);
+    border-radius:10px;
+  }
   
   @media(max-width:640px){
     .container { flex-direction:column; height:auto; }
@@ -250,6 +347,18 @@
 
   <!-- ── CHARTS ── -->
   <main id="mainArea">
+    <div class="range-card">
+      <div class="range-title">Rango de fechas</div>
+      <div class="range-row">
+        <div class="range-date" id="rangeDateStart">--/--/----</div>
+        <div class="range-slider-wrap">
+          <div class="range-track"><div class="range-fill" id="rangeFill"></div></div>
+          <input type="range" id="rangeStart" min="0" max="0" value="0" step="1" aria-label="Fecha inicial">
+          <input type="range" id="rangeEnd" min="0" max="0" value="0" step="1" aria-label="Fecha final">
+        </div>
+        <div class="range-date" id="rangeDateEnd">--/--/----</div>
+      </div>
+    </div>
     <!-- Temperatura -->
     <div class="chart-card" id="card-temp">
       <h3>🌡 Temperatura (°C)</h3>
@@ -339,6 +448,111 @@ const SENSORS = [
 let darkMode = false;
 let active = new Set(SENSORS.map(s => s.key));
 let charts = {};
+let datePoints = [];
+let dateRange = { start: 0, end: 0 };
+
+function fmtDate(d) {
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function getFilteredSource() {
+  const source = (RAW_API ?? RAW);
+  if (!source || source.length === 0) return [];
+  if (!datePoints.length) return source;
+  const startDate = datePoints[dateRange.start] ?? datePoints[0];
+  const endDate = datePoints[dateRange.end] ?? datePoints[datePoints.length - 1];
+  return source.filter(r => {
+    const d = new Date(r.tiempo);
+    if (isNaN(d)) return false;
+    return d >= startDate && d <= endDate;
+  });
+}
+
+function updateRangeVisual() {
+  const startInput = document.getElementById('rangeStart');
+  const endInput = document.getElementById('rangeEnd');
+  const max = Math.max(datePoints.length - 1, 0);
+  startInput.max = String(max);
+  endInput.max = String(max);
+
+  if (!datePoints.length) {
+    startInput.value = '0';
+    endInput.value = '0';
+    document.getElementById('rangeDateStart').textContent = '--/--/----';
+    document.getElementById('rangeDateEnd').textContent = '--/--/----';
+    document.getElementById('rangeFill').style.left = '0%';
+    document.getElementById('rangeFill').style.width = '0%';
+    return;
+  }
+
+  dateRange.start = Math.max(0, Math.min(dateRange.start, max));
+  dateRange.end = Math.max(0, Math.min(dateRange.end, max));
+  if (dateRange.start > dateRange.end) dateRange.start = dateRange.end;
+
+  startInput.value = String(dateRange.start);
+  endInput.value = String(dateRange.end);
+  document.getElementById('rangeDateStart').textContent = fmtDate(datePoints[dateRange.start]);
+  document.getElementById('rangeDateEnd').textContent = fmtDate(datePoints[dateRange.end]);
+
+  if (max === 0) {
+    document.getElementById('rangeFill').style.left = '0%';
+    document.getElementById('rangeFill').style.width = '100%';
+    return;
+  }
+
+  const left = (dateRange.start / max) * 100;
+  const right = (dateRange.end / max) * 100;
+  const fill = document.getElementById('rangeFill');
+  fill.style.left = `${left}%`;
+  fill.style.width = `${Math.max(right - left, 0)}%`;
+}
+
+function initDateRangeFromSource() {
+  const source = (RAW_API ?? RAW);
+  if (!source || source.length === 0) {
+    datePoints = [];
+    dateRange = { start: 0, end: 0 };
+    updateRangeVisual();
+    return;
+  }
+
+  const allDates = source
+    .map(r => new Date(r.tiempo))
+    .filter(d => !isNaN(d))
+    .sort((a, b) => a - b);
+
+  if (!allDates.length) {
+    datePoints = [];
+    dateRange = { start: 0, end: 0 };
+    updateRangeVisual();
+    return;
+  }
+
+  const prevStart = datePoints[dateRange.start];
+  const prevEnd = datePoints[dateRange.end];
+  datePoints = allDates;
+  const max = datePoints.length - 1;
+
+  if (!prevStart || !prevEnd) {
+    dateRange = { start: 0, end: max };
+  } else {
+    let nearestStart = 0;
+    let nearestEnd = max;
+    let bestStartDiff = Infinity;
+    let bestEndDiff = Infinity;
+    datePoints.forEach((d, idx) => {
+      const ds = Math.abs(d - prevStart);
+      const de = Math.abs(d - prevEnd);
+      if (ds < bestStartDiff) { bestStartDiff = ds; nearestStart = idx; }
+      if (de < bestEndDiff) { bestEndDiff = de; nearestEnd = idx; }
+    });
+    dateRange = { start: Math.min(nearestStart, nearestEnd), end: Math.max(nearestStart, nearestEnd) };
+  }
+  updateRangeVisual();
+}
 
 // ── THEME ─────────────────────────────────────────────────────────────
 function toggleTheme() {
@@ -421,6 +635,7 @@ async function fetchAndUpdate() {
     const payload = await res.json();
     const apiRows = Array.isArray(payload) ? payload : (payload?.lecturas ?? []);
     updateCharts(apiRows);
+    initDateRangeFromSource();
     rebuildAll();
   } catch (err) {
     console.error('Error al cargar datos desde ../datos.php:', err);
@@ -432,7 +647,7 @@ function buildStats(group) {
   const el = document.getElementById('stats-' + group);
   const sens = SENSORS.filter(s => s.group === group && active.has(s.key));
   if (!sens.length) { el.innerHTML=''; return; }
-  const source = (RAW_API ?? RAW);
+  const source = getFilteredSource();
   
   if (!source || source.length === 0) {
       el.innerHTML = '<div class="stat-chip">Esperando datos...</div>';
@@ -466,7 +681,7 @@ function makeChart(canvasId, group) {
     return;
   }
 
-  const source = (RAW_API ?? RAW);
+  const source = getFilteredSource();
   const labels = source.map(r => new Date(r.tiempo));
   const datasets = sens.map(s => ({
     label: s.label + ' (' + s.unit + ')',
@@ -522,6 +737,7 @@ function makeChart(canvasId, group) {
 
 // ── REBUILD ALL ───────────────────────────────────────────────────────
 function rebuildAll() {
+  updateRangeVisual();
   ['temp','strain','tilt','level'].forEach(g => {
     buildStats(g);
     makeChart('chart-' + g, g);
@@ -534,6 +750,16 @@ document.getElementById('themeBtn')?.addEventListener('click', toggleTheme);
 document.getElementById('btnCloseUpload')?.addEventListener('click', closeUploadModal);
 document.querySelectorAll('.sel-btn[data-group]').forEach(btn => {
   btn.addEventListener('click', () => selectGroup(btn.dataset.group));
+});
+document.getElementById('rangeStart')?.addEventListener('input', (e) => {
+  const next = Number(e.target.value);
+  dateRange.start = Math.min(next, dateRange.end);
+  rebuildAll();
+});
+document.getElementById('rangeEnd')?.addEventListener('input', (e) => {
+  const next = Number(e.target.value);
+  dateRange.end = Math.max(next, dateRange.start);
+  rebuildAll();
 });
 
 buildSidebar();
