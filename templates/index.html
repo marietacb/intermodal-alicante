@@ -165,15 +165,54 @@
     margin-bottom:8px;
   }
   .range-date {
-    min-width:96px;
+    min-width:118px;
+    width:100%;
     text-align:center;
     font-size:.85rem;
     font-weight:600;
+    color:var(--text);
     background:var(--bg);
     border:1px solid var(--border);
     border-radius:8px;
-    padding:6px 8px;
+    padding:6px 34px 6px 8px;
     box-shadow:var(--shadow);
+  }
+  .range-date-wrap {
+    position:relative;
+    min-width:132px;
+  }
+  .range-date-btn {
+    position:absolute;
+    right:6px;
+    top:50%;
+    transform:translateY(-50%);
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    opacity:.8;
+    font-size:.95rem;
+    line-height:1;
+    padding:2px;
+  }
+  .range-date-btn:hover { opacity:1; }
+  .range-date-picker {
+    position:absolute;
+    inset:0;
+    opacity:0;
+    pointer-events:none;
+  }
+  .range-date:focus {
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 0 0 2px rgba(59,130,246,.18);
+  }
+  .range-date:disabled {
+    opacity:.65;
+    cursor:not-allowed;
+  }
+  .range-date-wrap.disabled .range-date-btn {
+    opacity:.45;
+    cursor:not-allowed;
   }
   .range-slider-wrap {
     position:relative;
@@ -352,13 +391,21 @@
     <div class="range-card">
       <div class="range-title">Rango de fechas</div>
       <div class="range-row">
-        <div class="range-date" id="rangeDateStart">--/--/----</div>
+        <div class="range-date-wrap">
+          <input type="text" class="range-date" id="rangeDateStart" aria-label="Fecha inicial" placeholder="dd/mm/aaaa" inputmode="numeric">
+          <button type="button" class="range-date-btn" id="rangeDateStartBtn" aria-label="Abrir calendario fecha inicial">📅</button>
+          <input type="date" class="range-date-picker" id="rangeDateStartPicker" tabindex="-1" aria-hidden="true">
+        </div>
         <div class="range-slider-wrap">
           <div class="range-track"><div class="range-fill" id="rangeFill"></div></div>
           <input type="range" id="rangeStart" min="0" max="0" value="0" step="1" aria-label="Fecha inicial">
           <input type="range" id="rangeEnd" min="0" max="0" value="0" step="1" aria-label="Fecha final">
         </div>
-        <div class="range-date" id="rangeDateEnd">--/--/----</div>
+        <div class="range-date-wrap">
+          <input type="text" class="range-date" id="rangeDateEnd" aria-label="Fecha final" placeholder="dd/mm/aaaa" inputmode="numeric">
+          <button type="button" class="range-date-btn" id="rangeDateEndBtn" aria-label="Abrir calendario fecha final">📅</button>
+          <input type="date" class="range-date-picker" id="rangeDateEndPicker" tabindex="-1" aria-hidden="true">
+        </div>
       </div>
     </div>
     <!-- Temperatura -->
@@ -460,6 +507,91 @@ function fmtDate(d) {
   return `${day}/${month}/${year}`;
 }
 
+function toInputDateValue(d) {
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${year}-${month}-${day}`;
+}
+
+function parseInputDate(value) {
+  if (!value) return null;
+  const raw = value.trim();
+  let y; let m; let d;
+
+  if (raw.includes('/')) {
+    const parts = raw.split('/').map(Number);
+    if (parts.length !== 3) return null;
+    [d, m, y] = parts;
+  } else if (raw.includes('-')) {
+    const parts = raw.split('-').map(Number);
+    if (parts.length !== 3) return null;
+    [y, m, d] = parts;
+  } else {
+    return null;
+  }
+
+  if (!y || !m || !d) return null;
+  const parsed = new Date(y, m - 1, d, 12, 0, 0, 0);
+  return isNaN(parsed) ? null : parsed;
+}
+
+function dateOnly(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function applyManualDateInput(which) {
+  if (!datePoints.length) return;
+
+  const input = document.getElementById(which === 'start' ? 'rangeDateStart' : 'rangeDateEnd');
+  const minDate = dateOnly(datePoints[0]);
+  const maxDate = dateOnly(datePoints[datePoints.length - 1]);
+  const parsed = parseInputDate(input.value);
+  if (!parsed) {
+    updateRangeVisual();
+    return;
+  }
+
+  const clamped = dateOnly(parsed) < minDate ? minDate : (dateOnly(parsed) > maxDate ? maxDate : dateOnly(parsed));
+  if (which === 'start') {
+    dateRange.start = Math.min(findStartIndexForDate(clamped), dateRange.end);
+  } else {
+    dateRange.end = Math.max(findEndIndexForDate(clamped), dateRange.start);
+  }
+  rebuildAll();
+}
+
+function openDatePicker(which) {
+  const picker = document.getElementById(which === 'start' ? 'rangeDateStartPicker' : 'rangeDateEndPicker');
+  if (!picker || picker.disabled) return;
+  if (typeof picker.showPicker === 'function') picker.showPicker();
+  else picker.click();
+}
+
+function applyDateFromPicker(which) {
+  const picker = document.getElementById(which === 'start' ? 'rangeDateStartPicker' : 'rangeDateEndPicker');
+  const input = document.getElementById(which === 'start' ? 'rangeDateStart' : 'rangeDateEnd');
+  if (!picker || !input || !picker.value) return;
+  const parsed = parseInputDate(picker.value);
+  if (!parsed) return;
+  input.value = fmtDate(parsed);
+  applyManualDateInput(which);
+}
+
+function findStartIndexForDate(targetDate) {
+  const dayStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+  const idx = datePoints.findIndex(d => d >= dayStart);
+  return idx === -1 ? Math.max(datePoints.length - 1, 0) : idx;
+}
+
+function findEndIndexForDate(targetDate) {
+  const dayEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+  for (let i = datePoints.length - 1; i >= 0; i--) {
+    if (datePoints[i] <= dayEnd) return i;
+  }
+  return 0;
+}
+
 function getFilteredSource() {
   const source = (RAW_API ?? RAW);
   if (!source || source.length === 0) return [];
@@ -476,6 +608,12 @@ function getFilteredSource() {
 function updateRangeVisual() {
   const startInput = document.getElementById('rangeStart');
   const endInput = document.getElementById('rangeEnd');
+  const startDateInput = document.getElementById('rangeDateStart');
+  const endDateInput = document.getElementById('rangeDateEnd');
+  const startDatePicker = document.getElementById('rangeDateStartPicker');
+  const endDatePicker = document.getElementById('rangeDateEndPicker');
+  const startWrap = startDateInput?.closest('.range-date-wrap');
+  const endWrap = endDateInput?.closest('.range-date-wrap');
   const max = Math.max(datePoints.length - 1, 0);
   startInput.max = String(max);
   endInput.max = String(max);
@@ -483,8 +621,14 @@ function updateRangeVisual() {
   if (!datePoints.length) {
     startInput.value = '0';
     endInput.value = '0';
-    document.getElementById('rangeDateStart').textContent = '--/--/----';
-    document.getElementById('rangeDateEnd').textContent = '--/--/----';
+    startDateInput.value = '';
+    endDateInput.value = '';
+    startDateInput.disabled = true;
+    endDateInput.disabled = true;
+    if (startDatePicker) { startDatePicker.value = ''; startDatePicker.disabled = true; }
+    if (endDatePicker) { endDatePicker.value = ''; endDatePicker.disabled = true; }
+    startWrap?.classList.add('disabled');
+    endWrap?.classList.add('disabled');
     document.getElementById('rangeFill').style.left = '0%';
     document.getElementById('rangeFill').style.width = '0%';
     return;
@@ -496,8 +640,24 @@ function updateRangeVisual() {
 
   startInput.value = String(dateRange.start);
   endInput.value = String(dateRange.end);
-  document.getElementById('rangeDateStart').textContent = fmtDate(datePoints[dateRange.start]);
-  document.getElementById('rangeDateEnd').textContent = fmtDate(datePoints[dateRange.end]);
+  startDateInput.disabled = false;
+  endDateInput.disabled = false;
+  startWrap?.classList.remove('disabled');
+  endWrap?.classList.remove('disabled');
+  if (startDatePicker) {
+    startDatePicker.disabled = false;
+    startDatePicker.min = toInputDateValue(datePoints[0]);
+    startDatePicker.max = toInputDateValue(datePoints[max]);
+    startDatePicker.value = toInputDateValue(datePoints[dateRange.start]);
+  }
+  if (endDatePicker) {
+    endDatePicker.disabled = false;
+    endDatePicker.min = toInputDateValue(datePoints[0]);
+    endDatePicker.max = toInputDateValue(datePoints[max]);
+    endDatePicker.value = toInputDateValue(datePoints[dateRange.end]);
+  }
+  startDateInput.value = fmtDate(datePoints[dateRange.start]);
+  endDateInput.value = fmtDate(datePoints[dateRange.end]);
 
   if (max === 0) {
     document.getElementById('rangeFill').style.left = '0%';
@@ -762,6 +922,30 @@ document.getElementById('rangeEnd')?.addEventListener('input', (e) => {
   const next = Number(e.target.value);
   dateRange.end = Math.max(next, dateRange.start);
   rebuildAll();
+});
+document.getElementById('rangeDateStart')?.addEventListener('change', (e) => {
+  applyManualDateInput('start');
+});
+document.getElementById('rangeDateEnd')?.addEventListener('change', (e) => {
+  applyManualDateInput('end');
+});
+document.getElementById('rangeDateStartBtn')?.addEventListener('click', () => {
+  openDatePicker('start');
+});
+document.getElementById('rangeDateEndBtn')?.addEventListener('click', () => {
+  openDatePicker('end');
+});
+document.getElementById('rangeDateStartPicker')?.addEventListener('change', () => {
+  applyDateFromPicker('start');
+});
+document.getElementById('rangeDateEndPicker')?.addEventListener('change', () => {
+  applyDateFromPicker('end');
+});
+document.getElementById('rangeDateStart')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') applyManualDateInput('start');
+});
+document.getElementById('rangeDateEnd')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') applyManualDateInput('end');
 });
 
 buildSidebar();
